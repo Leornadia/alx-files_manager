@@ -1,58 +1,29 @@
-import redis from 'redis';
-import { promisify } from 'util';
+import { createClient } from 'redis';
 
 class RedisClient {
     constructor() {
-        // Create Redis client
-        this.client = redis.createClient();
-
-        // Display error messages
-        this.client.on('error', (err) => {
-            console.error(`Redis client error: ${err}`);
-        });
-
-        // Promisify the Redis client methods for async/await usage
-        this.getAsync = promisify(this.client.get).bind(this.client);
-        this.setAsync = promisify(this.client.set).bind(this.client);
-        this.delAsync = promisify(this.client.del).bind(this.client);
+        this.client = createClient(); // Automatically connects in Redis v4+
+        this.client.on('error', (err) => console.error('Error connecting to Redis:', err));
     }
 
-    // Check if Redis client is connected
     isAlive() {
-        return this.client.connected;
+        return this.client.isReady;
     }
 
-    // Asynchronously get a value from Redis
     async get(key) {
-        try {
-            const value = await this.getAsync(key);
-            return value;
-        } catch (err) {
-            console.error(`Error getting key ${key}: ${err}`);
-            return null;
-        }
+        return this.client.get(key);
     }
 
-    // Asynchronously set a key with a value and expiration duration
     async set(key, value, duration) {
-        try {
-            await this.setAsync(key, value, 'EX', duration);
-        } catch (err) {
-            console.error(`Error setting key ${key}: ${err}`);
-        }
+        await this.client.set(key, value);
+        await this.client.expire(key, duration);
     }
 
-    // Asynchronously delete a key from Redis
     async del(key) {
-        try {
-            await this.delAsync(key);
-        } catch (err) {
-            console.error(`Error deleting key ${key}: ${err}`);
-        }
+        await this.client.del(key);
     }
 }
 
-// Export an instance of RedisClient
 const redisClient = new RedisClient();
 export default redisClient;
 
