@@ -1,19 +1,20 @@
 import express from 'express';
-import AppController from '../controllers/AppController.js';
-import UsersController from '../controllers/UsersController.js';
-import AuthController from '../controllers/AuthController.js';
+import AppController from '../controllers/AppController';
+import AuthController from '../controllers/AuthController';
+import UsersController from '../controllers/UsersController'; // Import UsersController
 
-const router = express.Router();
+const router = express.Router(); // Create a router instance
 
-// Existing routes
 router.get('/status', AppController.getStatus);
 router.get('/stats', AppController.getStats);
-router.post('/users', UsersController.postNew);
 
-// Authentication routes
+// Add user creation route
+router.post('/users', UsersController.postNew);  // POST /users
+
+// Add authentication routes
 router.get('/connect', AuthController.getConnect);
 router.get('/disconnect', AuthController.getDisconnect);
-router.get('/users/me', AuthController.authorize, UsersController.getMe); //Protected route
+router.get('/users/me', UsersController.getMe);
 
+export default router; // Export the router instance
 
-export default router;
