@@ -1,5 +1,5 @@
-import redisClient from '../utils/redis'; // Import your Redis client
-import dbClient from '../utils/db';       // Import your DB client
+import redisClient from '../utils/redis';
+import dbClient from '../utils/db';
 import { v4 as uuidv4 } from 'uuid';
 import sha1 from 'sha1';
 
@@ -7,13 +7,17 @@ class AuthController {
   static async getConnect(req, res) {
     const authHeader = req.headers.authorization;
 
-    if (!authHeader) {
+    if (!authHeader || !authHeader.startsWith('Basic ')) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
     const base64Credentials = authHeader.split(' ')[1];
-    const credentials = Buffer.from(base64Credentials, 'base64').toString('ascii');
-    const [email, password] = credentials.split(':');
+    const decodedCredentials = Buffer.from(base64Credentials, 'base64').toString();
+    const [email, password] = decodedCredentials.split(':');
+
+    if (!email || !password) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
     const hashedPassword = sha1(password);
     const user = await dbClient.db.collection('users').findOne({ email, password: hashedPassword });
@@ -23,9 +27,8 @@ class AuthController {
     }
 
     const token = uuidv4();
-    const tokenKey = `auth_${token}`;
-
-    await redisClient.set(tokenKey, user._id.toString(), 24 * 3600);
+    const key = `auth_${token}`;
+    await redisClient.set(key, user._id.toString(), 86400); // Store for 24 hours (86400 seconds)
 
     return res.status(200).json({ token });
   }

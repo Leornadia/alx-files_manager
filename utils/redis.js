@@ -2,13 +2,13 @@ import { createClient } from 'redis';
 
 class RedisClient {
   constructor() {
-    // Create a Redis client
+    // Create and initialize the Redis client
     this.client = createClient();
-    
-    // Display any Redis client errors in the console
+
+    // Handle Redis connection errors
     this.client.on('error', (err) => console.error(`Redis Client Error: ${err}`));
 
-    // Connect the client (Redis 4.x requires explicit connection)
+    // Ensure the client is connected before performing any operations
     this.client.connect().then(() => {
       console.log('Redis client connected');
     }).catch((err) => {
@@ -16,12 +16,12 @@ class RedisClient {
     });
   }
 
-  // Function to check if Redis connection is alive
+  // Check if the Redis client is alive and connected
   isAlive() {
     return this.client.isOpen;
   }
 
-  // Asynchronous function to get a value by key
+  // Asynchronously get the value of a given key from Redis
   async get(key) {
     try {
       return await this.client.get(key);
@@ -31,18 +31,18 @@ class RedisClient {
     }
   }
 
-  // Asynchronous function to set a value with expiration time (in seconds)
+  // Asynchronously set a value for a given key with an expiration duration
   async set(key, value, duration) {
     try {
       await this.client.set(key, value, {
-        EX: duration // Set expiration time in seconds
+        EX: duration, // Set expiration time in seconds
       });
     } catch (err) {
       console.error(`Error setting key ${key}: ${err}`);
     }
   }
 
-  // Asynchronous function to delete a key-value pair
+  // Asynchronously delete a key-value pair from Redis
   async del(key) {
     try {
       await this.client.del(key);
@@ -52,7 +52,7 @@ class RedisClient {
   }
 }
 
-// Create and export an instance of RedisClient
+// Export an instance of RedisClient
 const redisClient = new RedisClient();
 export default redisClient;
 
