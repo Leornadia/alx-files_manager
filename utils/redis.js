@@ -1,58 +1,42 @@
-import redis from 'redis';
+import { createClient } from 'redis';
 import { promisify } from 'util';
 
 class RedisClient {
-    constructor() {
-        // Create Redis client
-        this.client = redis.createClient();
+  constructor() {
+    // Create a Redis client
+    this.client = createClient();
 
-        // Display error messages
-        this.client.on('error', (err) => {
-            console.error(`Redis client error: ${err}`);
-        });
+    // Display any Redis client errors in the console
+    this.client.on('error', (err) => console.error(`Redis Client Error: ${err}`));
 
-        // Promisify the Redis client methods for async/await usage
-        this.getAsync = promisify(this.client.get).bind(this.client);
-        this.setAsync = promisify(this.client.set).bind(this.client);
-        this.delAsync = promisify(this.client.del).bind(this.client);
-    }
+    // Promisify Redis commands for easier usage with async/await
+    this.getAsync = promisify(this.client.get).bind(this.client);
+    this.setAsync = promisify(this.client.set).bind(this.client);
+    this.delAsync = promisify(this.client.del).bind(this.client);
+  }
 
-    // Check if Redis client is connected
-    isAlive() {
-        return this.client.connected;
-    }
+  // Function to check if Redis connection is alive
+  isAlive() {
+    return this.client.connected;
+  }
 
-    // Asynchronously get a value from Redis
-    async get(key) {
-        try {
-            const value = await this.getAsync(key);
-            return value;
-        } catch (err) {
-            console.error(`Error getting key ${key}: ${err}`);
-            return null;
-        }
-    }
+  // Asynchronous function to get a value by key
+  async get(key) {
+    return await this.getAsync(key);
+  }
 
-    // Asynchronously set a key with a value and expiration duration
-    async set(key, value, duration) {
-        try {
-            await this.setAsync(key, value, 'EX', duration);
-        } catch (err) {
-            console.error(`Error setting key ${key}: ${err}`);
-        }
-    }
+  // Asynchronous function to set a value with expiration time (in seconds)
+  async set(key, value, duration) {
+    await this.setAsync(key, value, 'EX', duration);
+  }
 
-    // Asynchronously delete a key from Redis
-    async del(key) {
-        try {
-            await this.delAsync(key);
-        } catch (err) {
-            console.error(`Error deleting key ${key}: ${err}`);
-        }
-    }
+  // Asynchronous function to delete a key-value pair
+  async del(key) {
+    await this.delAsync(key);
+  }
 }
 
-// Export an instance of RedisClient
+// Create and export an instance of RedisClient
 const redisClient = new RedisClient();
 export default redisClient;
 
