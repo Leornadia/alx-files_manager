@@ -1,41 +1,41 @@
-const redisClient = require('../utils/redis');
-const dbClient = require('../utils/db');
-const { ObjectId } = require('mongodb');
-const sha1 = require('sha1');
-const { v4: uuidv4 } = require('uuid');
+import { ObjectId } from 'mongodb';
+import dbClient from '../utils/db';
+import { hashPassword } from '../utils/auth';
+import { userQueue } from '../worker';
 
-// User authentication controller
 class UsersController {
-  static async connect(req, res) {
-    const auth = req.header('Authorization');
-    if (!auth) return res.status(401).json({ error: 'Unauthorized' });
+  static async postNew(req, res) {
+    const { email, password } = req.body;
 
-    const encodedCredentials = auth.split(' ')[1];
-    const decodedCredentials = Buffer.from(encodedCredentials, 'base64').toString('utf-8');
-    const [email, password] = decodedCredentials.split(':');
+    if (!email) {
+      return res.status(400).json({ error: 'Missing email' });
+    }
 
-    const hashedPassword = sha1(password);
-    const user = await dbClient.collection('users').findOne({ email, password: hashedPassword });
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    if (!password) {
+      return res.status(400).json({ error: 'Missing password' });
+    }
 
-    const token = uuidv4();
-    await redisClient.set(`auth_${token}`, user._id.toString(), 24 * 3600);
-    return res.json({ token });
-  }
+    // Check if email already exists
+    const userExists = await dbClient.usersCollection.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ error: 'Already exist' });
+    }
 
-  static async getMe(req, res) {
-    const token = req.header('X-Token');
-    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+    // Hash the password and create a new user
+    const hashedPassword = hashPassword(password);
+    const result = await dbClient.usersCollection.insertOne({
+      email,
+      password: hashedPassword,
+    });
 
-    const userId = await redisClient.get(`auth_${token}`);
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = result.insertedId;
 
-    const user = await dbClient.collection('users').findOne({ _id: ObjectId(userId) });
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    // Add job to Bull queue for sending welcome email
+    await userQueue.add({ userId });
 
-    return res.json({ id: user._id, email: user.email });
+    return res.status(201).json({ id: userId, email });
   }
 }
 
-module.exports = UsersController;
+export default UsersController;
 

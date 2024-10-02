@@ -1,37 +1,50 @@
 import Bull from 'bull';
-import { promises as fs } from 'fs';
-import imageThumbnail from 'image-thumbnail';
+import nodemailer from 'nodemailer';
 import dbClient from './utils/db';
 
-// Create a Bull queue
-const fileQueue = new Bull('fileQueue');
+export const userQueue = new Bull('userQueue');
 
-// Process the fileQueue for thumbnail generation
-fileQueue.process(async (job, done) => {
-    const { fileId, userId } = job.data;
+// Set up email transport (use a real SMTP server in production)
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: 'your-email@gmail.com',
+    pass: 'your-email-password',
+  },
+});
 
-    // Check if fileId or userId is missing
-    if (!fileId) throw new Error('Missing fileId');
-    if (!userId) throw new Error('Missing userId');
+// Process the queue
+userQueue.process(async (job, done) => {
+  const { userId } = job.data;
 
-    // Find the file document in the DB
-    const file = await dbClient.db.collection('files').findOne({ _id: dbClient.objectId(fileId), userId: dbClient.objectId(userId) });
-    if (!file) throw new Error('File not found');
+  if (!userId) {
+    done(new Error('Missing userId'));
+    return;
+  }
 
-    // Check if the file is an image
-    if (file.type !== 'image') throw new Error('File is not an image');
+  // Fetch user from the database
+  const user = await dbClient.usersCollection.findOne({ _id: ObjectId(userId) });
 
-    // Generate thumbnails for 500px, 250px, and 100px
-    try {
-        const thumbnailSizes = [500, 250, 100];
-        for (const size of thumbnailSizes) {
-            const thumbnail = await imageThumbnail(file.localPath, { width: size });
-            const thumbnailPath = `${file.localPath}_${size}`;
-            await fs.writeFile(thumbnailPath, thumbnail);
-        }
-        done();
-    } catch (error) {
-        done(new Error('Failed to generate thumbnails'));
+  if (!user) {
+    done(new Error('User not found'));
+    return;
+  }
+
+  // Send welcome email
+  const mailOptions = {
+    from: 'your-email@gmail.com',
+    to: user.email,
+    subject: 'Welcome to Our Platform',
+    text: `Hello ${user.email}, welcome to our platform!`,
+  };
+
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      done(new Error('Failed to send email'));
+    } else {
+      console.log(`Email sent: ${info.response}`);
+      done();
     }
+  });
 });
 
