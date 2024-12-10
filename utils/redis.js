@@ -1,40 +1,62 @@
-// utils/redis.js
+import { createClient } from 'redis';
 
 class RedisClient {
-  constructor(host = 'localhost', port = 6379) {
-    this.redisClient = null;
-    this.host = host;
-    this.port = port;
+  constructor() {
+    this.client = createClient({
+      url: process.env.REDIS_URL || 'redis://localhost:6379',
+    });
 
-    this.connect();
-  }
+    this.client.on('error', (err) => {
+      console.error(`Redis Error: ${err}`);
+    });
 
-  connect() {
-    try {
-      this.redisClient = redis.createClient(this.port, this.host);
-      this.redisClient.on('error', (err) => {
-        console.error(`Redis Client Error: ${err}`);
-      });
-    } catch (error) {
-      console.error(`Failed to connect to Redis: ${error}`);
-    }
+    this.client.on('connect', () => {
+      console.log('Redis connected');
+    });
+
+    this.client.on('ready', () => {
+      console.log('Redis ready!');
+    });
+
+    this.client.on('reconnecting', () => {
+      console.log('Redis reconnecting');
+    });
+
+    this.isReady = false;
+
+    this.client.connect().then(() => {
+      this.isReady = true;
+    }).catch((err) => {
+      console.error(`Failed to connect to Redis: ${err}`);
+    });
   }
 
   isAlive() {
-    return this.redisClient && this.redisClient.ping() ===pong;
+    return this.isReady;
   }
 
   async get(key) {
-    return await this.redisClient.get(key);
+    if (!this.isReady) {
+      throw new Error('Redis client is not ready');
+    }
+    return this.client.get(key);
   }
 
-  async set(key, value, seconds) {
-    await this.redisClient.set(key, value, seconds * 1000);
+  async set(key, value, duration) {
+    if (!this.isReady) {
+      throw new Error('Redis client is not ready');
+    }
+    return this.client.setEx(key, duration, value);
   }
 
   async del(key) {
-    await this.redisClient.del(key);
+    if (!this.isReady) {
+      throw new Error('Redis client is not ready');
+    }
+    return this.client.del(key);
   }
 }
 
-export const redisClient = new RedisClient();
+const redisClient = new RedisClient();
+
+export default redisClient;
